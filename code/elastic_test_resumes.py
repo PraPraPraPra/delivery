@@ -190,6 +190,10 @@ mapping = {
                 "skill": {
                     "type": "text"
                 },
+                "skill_vector": {
+                    "type": "dense_vector",
+                    "dims": 100
+                },
                 "experience": {
                     "type": "text"
                 }

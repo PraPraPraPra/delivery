@@ -16,7 +16,7 @@ from gensim.test.utils import common_texts, get_tmpfile
 from gensim.models import Word2Vec
 import logging
 
-from ggeop_skill_transform_v4 import skill_transform;
+from skill_transform_v4 import skill_transform;
 
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -49,13 +49,10 @@ data = pd.read_csv('data/ggeop/JobsDataset.csv', header = 0, names = ['Query', '
 
 (cleaned_description, max_size, version) = skill_transform(data)
 
-#Create model
-#model = Word2Vec(cleaned_description , size=100, window=5, min_count=1, workers=4)
-# There was this error: TypeError: __init__() got an unexpected keyword argument 'size'
-# Assumo size is now vector_size....
 
-#Mudeio window_size para englobar a oferta toda - Funciona muito melhor!!!
+# Window size should encapsulate the whole document, since all skills inside a given cv or job offer should be somewhat related
 model = Word2Vec(cleaned_description , vector_size=100, window=max_size, min_count=5, workers=6)
+model.save("saved_model")
 #model = Word2Vec(cleaned_description , vector_size=100, window=100, min_count=5, workers=4) #teste com window=100
 
 #model = Word2Vec(cleaned_description , vector_size=100, window=5, min_count=5, workers=4)

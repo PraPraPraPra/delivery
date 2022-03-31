@@ -3,12 +3,11 @@ from os import read, system
 from elasticsearch import Elasticsearch
 import csv
 import json
-import resumes
-import simple_resumes
+from gensim.models import Word2Vec
 
 es = Elasticsearch()
 
-index_name= "test-cv-v40"
+index_name= "test-cv-v70"
 
 index = 3
 
@@ -118,54 +117,121 @@ print("++++\n")
 
 
 
-print("++++ Query 4 (Python + Begginer e English Advanced com boost em free_date)++++")
-print("------------")
-res3 = es.search(index=index_name, query={
-    "bool" : {
-        "must" : {
-            "nested" : {
-                "path" : "skills",
-                "query" : {
-                    "bool": {
-                        "must": [
-                                {"match" : {"skills.skill" : "Python" } },
-                                {"match" : {"skills.experience" : "Begginer" } }
-                        ]
-                    }
-                },
-                "inner_hits": {}
-        }
-        },
-        "must" : {
-            "nested" : {
-                "path" : "languages",
-                "query" : {
-                    "bool": {
-                        "must": [
-                                {"match" : {"languages.language" : "English" } },
-                                {"match" : {"languages.level" : "Advanced" } }
-                        ]
-                    }
-                },
-                "inner_hits": {}
-            }
-        },
-        "should" : {
-            "query" : {
-                "bool": {
-                    "must": [
-                            {"match" : {"languages.language" : "English" } },
-                            {"match" : {"languages.level" : "Advanced" } }
-                    ]
-                }
-            },
-            "inner_hits": {}
-        }
+# print("++++ Query 4 (Python + Begginer e English Advanced com boost em free_date)++++")
+# print("------------")
+# res3 = es.search(index=index_name, query={
+#     "bool" : {
+#         "must" : {
+#             "nested" : {
+#                 "path" : "skills",
+#                 "query" : {
+#                     "bool": {
+#                         "must": [
+#                                 {"match" : {"skills.skill" : "Python" } },
+#                                 {"match" : {"skills.experience" : "Begginer" } }
+#                         ]
+#                     }
+#                 },
+#                 "inner_hits": {}
+#         }
+#         },
+#         "must" : {
+#             "nested" : {
+#                 "path" : "languages",
+#                 "query" : {
+#                     "bool": {
+#                         "must": [
+#                                 {"match" : {"languages.language" : "English" } },
+#                                 {"match" : {"languages.level" : "Advanced" } }
+#                         ]
+#                     }
+#                 },
+#                 "inner_hits": {}
+#             }
+#         },
+#         "should" : {
+#             "query" : {
+#                 "bool": {
+#                     "must": [
+#                             {"match" : {"languages.language" : "English" } },
+#                             {"match" : {"languages.level" : "Advanced" } }
+#                     ]
+#                 }
+#             },
+#             "inner_hits": {}
+#         }
+#         }
+#     }
+# )
+# #print(res3)
+# print("Got %d Hits:" % res3['hits']['total']['value'])
+# for hit in res3['hits']['hits']:
+#     print(hit["_source"])
+# print("------------")
+# print("++++\n")
+
+
+
+print("++++ Query Elastic (Python)++++")
+
+model = Word2Vec.load("saved_model")
+query_vector = model.wv.get_vector("python".lower())
+
+
+res4 = es.search(index=index_name, query={
+    "script_score": {
+        "query": {"match_all": {}},
+        "script": {
+        "source": "cosineSimilarity(params.query_vector, params._source['skills']['skill']) + 1.0",
+        "params": {"query_vector": query_vector}
         }
     }
+    }
 )
-#print(res3)
-print("Got %d Hits:" % res3['hits']['total']['value'])
+
+
+res4 = es.search(index=index_name, query={
+    "function_score": {
+      "query": { "match_all": {} },
+      "functions": [
+        {
+          "random_score": {}
+        },
+        {
+          "script_score": {
+            "script": {
+              "source": """
+                double boost = 1.0;
+                if (params._source['skills'] != null && params._source['skills']['skill'] != null) {
+                    boost += 2.0;
+                }
+                return boost;
+              """
+            }
+          }
+        }
+      ],
+      "score_mode": "multiply",
+      "boost_mode": "replace"
+    }
+}
+)
+
+# res4 = es.search(index=index_name, query={
+#     "nested" : {
+#         "path" : "skills",
+#         "script_score": {
+#             "query": {"match_all": {}},
+#             "script": {
+#                 "source": "cosineSimilarity(params.query_vector, params._source['skills']['skill']) + 1.0",
+#                 "params": {"query_vector": query_vector,}
+#             }
+#         },
+#         "inner_hits": {}
+#     }
+# })
+
+print("Got %d Hits:" % res4['hits']['total']['value'])
 for hit in res3['hits']['hits']:
     print(hit["_source"])
 print("------------")
